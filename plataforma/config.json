@@ -1,0 +1,32 @@
+{
+  "school": {
+    "name": "I.E. Augusto Salazar Bondy 4015",
+    "shortName": "ASB 4015",
+    "facebook": "https://www.facebook.com/share/18pBELJ6jw/",
+    "location": "https://share.google/YClJ9vYz95HX5Omny",
+    "address": "Lima, Perú",
+    "phone": "",
+    "email": ""
+  },
+  "firebase": {
+    "apiKey": "TU_API_KEY",
+    "authDomain": "TU_DOMINIO.firebaseapp.com",
+    "projectId": "TU_PROJECT_ID",
+    "storageBucket": "TU_BUCKET.appspot.com",
+    "messagingSenderId": "TU_MESSAGING_SENDER_ID",
+    "appId": "TU_APP_ID"
+  },
+  "ai": {
+    "provider": "gemini",
+    "apiKey": "TU_GEMINI_API_KEY",
+    "model": "gemini-1.5-flash",
+    "enabled": true
+  },
+  "app": {
+    "version": "1.0.0",
+    "darkModeDefault": false,
+    "language": "es",
+    "maxFileSize": 10485760,
+    "allowedFileTypes": ["pdf", "jpg", "jpeg", "png", "mp4", "webm"]
+  }
+}
