@@ -4,17 +4,16 @@
     "shortName": "ASB 4015",
     "facebook": "https://www.facebook.com/share/18pBELJ6jw/",
     "location": "https://share.google/YClJ9vYz95HX5Omny",
-    "address": "Lima, Perú",
-    "phone": "",
-    "email": ""
+    "address": "Lima, Perú"
   },
   "firebase": {
-    "apiKey": "TU_API_KEY",
-    "authDomain": "TU_DOMINIO.firebaseapp.com",
-    "projectId": "TU_PROJECT_ID",
-    "storageBucket": "TU_BUCKET.appspot.com",
-    "messagingSenderId": "TU_MESSAGING_SENDER_ID",
-    "appId": "TU_APP_ID"
+    "apiKey": "AIzaSyD-CzLe28dqO9LFw0CjJfHP2Oauhcs17RM",
+    "authDomain": "augusto-salazar-bondy-6dcda.firebaseapp.com",
+    "projectId": "augusto-salazar-bondy-6dcda",
+    "storageBucket": "augusto-salazar-bondy-6dcda.firebasestorage.app",
+    "messagingSenderId": "680320129663",
+    "appId": "1:680320129663:web:dfdc13fcb6e13907c8bd4a",
+    "measurementId": "G-QRD3HVD90V"
   },
   "ai": {
     "provider": "gemini",
@@ -24,6 +23,8 @@
   },
   "app": {
     "version": "1.0.0",
+    "teacherCode": "ASB4015PROF",
+    "useStorage": false,
     "darkModeDefault": false,
     "language": "es",
     "maxFileSize": 10485760,
