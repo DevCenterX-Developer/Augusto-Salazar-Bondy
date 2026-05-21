@@ -646,3 +646,41 @@ textarea.form-input { min-height: 90px; resize: vertical; }
   .modal { border-radius: var(--radius) var(--radius) 0 0; margin-top: auto; }
   .modal-overlay { align-items: flex-end; padding: 0; }
 }
+
+/* ============ MODO OSCURO — FIXES ============ */
+[data-theme="dark"] .login-card { background: var(--bg-card); }
+[data-theme="dark"] .auth-section { background: var(--bg-card); }
+[data-theme="dark"] .role-btn { background: var(--bg-card); border-color: var(--border); color: var(--text); }
+[data-theme="dark"] .role-btn:hover { background: var(--primary-light); border-color: var(--primary); }
+[data-theme="dark"] .role-title { color: var(--text); }
+[data-theme="dark"] .role-desc { color: var(--text-secondary); }
+[data-theme="dark"] .input-wrap input { background: #0f172a; color: var(--text); border-color: var(--border); }
+[data-theme="dark"] .input-wrap input:focus { background: #1e293b; border-color: var(--primary); }
+[data-theme="dark"] .modal { background: var(--bg-card); }
+[data-theme="dark"] .modal-header { background: var(--bg-card); }
+[data-theme="dark"] .question-block { background: #1e293b; border-color: var(--border); }
+[data-theme="dark"] .answer-textarea { background: #0f172a; color: var(--text); border-color: var(--border); }
+[data-theme="dark"] .answer-textarea:focus { background: #1e293b; }
+[data-theme="dark"] .question-item { background: #1e293b; border-color: var(--border); }
+[data-theme="dark"] .add-q-btn { background: var(--bg-card); color: var(--text-secondary); border-color: var(--border); }
+[data-theme="dark"] .add-q-btn:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+[data-theme="dark"] .form-input { background: #0f172a; color: var(--text); border-color: var(--border); }
+[data-theme="dark"] .form-input:focus { background: #1e293b; }
+[data-theme="dark"] .topbar { background: var(--bg-card); }
+[data-theme="dark"] .topbar-search { background: #0f172a; border-color: var(--border); }
+[data-theme="dark"] .topbar-search input { color: var(--text); }
+[data-theme="dark"] .class-card { background: var(--bg-card); }
+[data-theme="dark"] .activity-item { background: var(--bg-card); }
+[data-theme="dark"] .student-item { background: var(--bg-card); }
+[data-theme="dark"] .resource-item { background: var(--bg); }
+[data-theme="dark"] .announcement-item { background: var(--bg-card); }
+[data-theme="dark"] .grade-table th { color: var(--text-muted); }
+[data-theme="dark"] .grade-table td { color: var(--text); }
+[data-theme="dark"] .stat-card { background: var(--bg-card); }
+[data-theme="dark"] .ai-feedback { background: #1a1f35; border-color: #2d3a6e; }
+[data-theme="dark"] option { background: #1e293b; color: var(--text); }
+[data-theme="dark"] .back-btn { background: var(--border); color: var(--text); }
+[data-theme="dark"] .auth-footer a { color: var(--primary); }
+[data-theme="dark"] .school-sub { color: rgba(255,255,255,0.8); }
+[data-theme="dark"] .loader-logo { color: var(--primary); }
+[data-theme="dark"] .global-loader { background: var(--bg-card); }

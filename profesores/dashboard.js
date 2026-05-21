@@ -292,6 +292,7 @@ function renderTeacherActivities(filtered = null) {
         ${pendingCount>0 ? `<span class="tag" style="background:var(--danger-light);color:var(--danger)">${pendingCount} por calificar</span>` : ''}
         <div style="display:flex;gap:6px;margin-top:4px">
           ${!a.published ? `<button class="btn-success" style="font-size:0.78rem;padding:5px 10px" onclick="publishActivity('${a.id}')"><i class="fas fa-paper-plane"></i> Publicar</button>` : ''}
+          <button class="btn-secondary" style="font-size:0.78rem;padding:5px 10px" onclick="event.stopPropagation();viewActivitySubmissions('${a.id}')"><i class="fas fa-inbox"></i> Entregas</button>
           <button class="btn-danger" style="font-size:0.78rem;padding:5px 10px" onclick="deleteActivity('${a.id}')"><i class="fas fa-trash"></i></button>
         </div>
       </div>
@@ -657,4 +658,58 @@ function loadStats() {
       <div style="flex:1"><div class="student-name">${s.name}</div><div class="student-meta">${s.count} calificadas</div></div>
       <span class="grade-badge grade-a">${Math.round(s.total/s.count)} pts prom.</span>
     </div>`).join('') : '<p style="color:var(--text-muted)">Sin datos aún.</p>';
+}
+
+// ── Ver entregas de una actividad específica ──
+async function viewActivitySubmissions(activityId) {
+  const act = teacherActivities.find(a => a.id === activityId);
+  if (!act) return;
+
+  await loadAllSubmissions();
+  const subs = allSubmissions.filter(s => s.activityId === activityId);
+
+  // Reutilizar modal grade pero con lista de entregas
+  document.getElementById('grade-modal-title').textContent = `Entregas — ${act.title}`;
+
+  if (!subs.length) {
+    document.getElementById('grade-modal-body').innerHTML = `
+      <div class="empty-state"><div class="empty-icon"><i class="fas fa-inbox"></i></div>
+      <h3>Sin entregas aún</h3><p>Ningún alumno ha enviado esta actividad todavía.</p></div>`;
+    document.getElementById('save-grade-btn').style.display = 'none';
+    openModal('grade-modal');
+    return;
+  }
+
+  document.getElementById('save-grade-btn').style.display = 'none';
+
+  let html = `<div style="margin-bottom:16px;color:var(--text-secondary);font-size:0.9rem">
+    ${subs.length} entrega(s) recibida(s) — ${subs.filter(s=>s.grade!==undefined).length} calificada(s)
+  </div>
+  <div class="activity-list">`;
+
+  subs.forEach(s => {
+    const graded = s.grade !== undefined;
+    html += `<div class="activity-item">
+      <div class="activity-icon" style="background:${graded?'var(--secondary-light)':'#fef3c7'};color:${graded?'#065f46':'#92400e'}">
+        <i class="fas ${graded?'fa-check-circle':'fa-clock'}"></i>
+      </div>
+      <div class="activity-info">
+        <div class="activity-name">${s.studentName || 'Alumno'}</div>
+        <div class="activity-meta">
+          <span><i class="fas fa-calendar"></i> ${AppUtils.formatDateTime(s.submittedAt)}</span>
+          ${graded ? `<span><i class="fas fa-star"></i> ${s.grade}/${act.maxScore||20}</span>` : '<span style="color:var(--accent)">Sin calificar</span>'}
+        </div>
+      </div>
+      <button class="btn-primary" style="font-size:0.82rem;padding:7px 14px;flex-shrink:0" onclick="
+        closeModal('grade-modal');
+        setTimeout(()=>{ document.getElementById('save-grade-btn').style.display=''; openGradeModal('${s.id}'); },150);
+      ">
+        <i class="fas fa-edit"></i> ${graded ? 'Editar nota' : 'Calificar'}
+      </button>
+    </div>`;
+  });
+
+  html += '</div>';
+  document.getElementById('grade-modal-body').innerHTML = html;
+  openModal('grade-modal');
 }
