@@ -298,6 +298,7 @@ function renderTeacherActivities(filtered = null) {
         ${pendingCount>0 ? `<span class="tag" style="background:var(--danger-light);color:var(--danger)">${pendingCount} por calificar</span>` : ''}
         <div style="display:flex;gap:6px;margin-top:4px">
           ${!a.published ? `<button class="btn-success" style="font-size:0.78rem;padding:5px 10px" onclick="publishActivity('${a.id}')"><i class="fas fa-paper-plane"></i> Publicar</button>` : ''}
+          <button class="btn-secondary" style="font-size:0.78rem;padding:5px 10px" onclick="event.stopPropagation();editActivity('${a.id}')"><i class="fas fa-edit"></i> Editar</button>
           <button class="btn-secondary" style="font-size:0.78rem;padding:5px 10px" onclick="event.stopPropagation();viewActivitySubmissions('${a.id}')"><i class="fas fa-inbox"></i> Entregas</button>
           <button class="btn-danger" style="font-size:0.78rem;padding:5px 10px" onclick="deleteActivity('${a.id}')"><i class="fas fa-trash"></i></button>
         </div>
@@ -364,6 +365,46 @@ function renderQuestionBuilder() {
   }).join('');
 }
 
+let editingActivityId = null; // null = crear, string = editar
+
+function editActivity(id) {
+  const a = teacherActivities.find(x => x.id === id);
+  if (!a) return;
+  editingActivityId = id;
+
+  // Rellenar el modal con los datos existentes
+  document.getElementById('act-title').value  = a.title || '';
+  document.getElementById('act-desc').value   = a.description || '';
+  document.getElementById('act-score').value  = a.maxScore || 20;
+
+  // Fecha de entrega
+  if (a.dueDate) {
+    const d = a.dueDate.toDate ? a.dueDate.toDate() : new Date(a.dueDate);
+    const local = new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,16);
+    document.getElementById('act-due').value = local;
+  } else {
+    document.getElementById('act-due').value = '';
+  }
+
+  // Clase
+  const clsSel = document.getElementById('act-class');
+  if (clsSel) clsSel.value = a.classId || '';
+
+  // Estado publicado
+  const pubRadio = document.querySelector(`input[name="act-publish"][value="${a.published?'published':'draft'}"]`);
+  if (pubRadio) pubRadio.checked = true;
+
+  // Preguntas
+  questions = (a.questions || []).map(q => ({...q}));
+  renderQuestionBuilder();
+
+  // Cambiar título del modal
+  const modalTitle = document.querySelector('#create-activity-modal .modal-header h3');
+  if (modalTitle) modalTitle.innerHTML = '<i class="fas fa-edit"></i> Editar Actividad';
+
+  AppUtils.openModal('create-activity-modal');
+}
+
 async function saveActivity() {
   const title     = document.getElementById('act-title').value.trim();
   const classId   = document.getElementById('act-class').value;
@@ -375,28 +416,44 @@ async function saveActivity() {
   if (!title)   { AppUtils.showToast('El título es obligatorio.','warning'); return; }
   if (!classId) { AppUtils.showToast('Selecciona una clase.','warning'); return; }
 
-  AppUtils.showLoader('Guardando actividad...');
+  AppUtils.showLoader(editingActivityId ? 'Actualizando actividad...' : 'Guardando actividad...');
   try {
-    const { db, collection, addDoc, serverTimestamp } = await AppUtils.initFirebase();
+    const { db, collection, addDoc, doc, updateDoc, serverTimestamp } = await AppUtils.initFirebase();
     const actData = {
       title, classId, description: desc,
       dueDate: dueStr ? new Date(dueStr) : null,
       maxScore, published,
       teacherId: teacherData.uid, teacherName: teacherData.name,
-      questions: questions.map(q => ({...q})),
-      createdAt: serverTimestamp()
+      questions: questions.map(q => ({...q}))
     };
-    const ref = await addDoc(collection(db, 'activities'), actData);
-    teacherActivities.push({ id: ref.id, ...actData });
+
+    if (editingActivityId) {
+      // Actualizar actividad existente
+      await updateDoc(doc(db, 'activities', editingActivityId), actData);
+      const idx = teacherActivities.findIndex(x => x.id === editingActivityId);
+      if (idx >= 0) teacherActivities[idx] = { ...teacherActivities[idx], ...actData };
+      AppUtils.showToast(`"${title}" actualizada correctamente.`, 'success');
+    } else {
+      // Crear nueva actividad
+      actData.createdAt = serverTimestamp();
+      const ref = await addDoc(collection(db, 'activities'), actData);
+      teacherActivities.push({ id: ref.id, ...actData });
+      AppUtils.showToast(`"${title}" ${published?'publicada':'guardada como borrador'}.`, 'success');
+    }
+
     renderTeacherActivities();
     updateDashboardStats();
     AppUtils.hideLoader();
+
+    // Reset modal
+    editingActivityId = null;
     closeModal('create-activity-modal');
     questions = [];
     ['act-title','act-desc','act-due'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
     document.getElementById('act-score').value='20';
     renderQuestionBuilder();
-    AppUtils.showToast(`"${title}" ${published?'publicada':'guardada como borrador'}.`,'success');
+    const modalTitle = document.querySelector('#create-activity-modal .modal-header h3');
+    if (modalTitle) modalTitle.innerHTML = '<i class="fas fa-tasks"></i> Nueva Actividad';
   } catch(err) { AppUtils.hideLoader(); AppUtils.showToast('Error guardando.','error'); console.error(err); }
 }
 

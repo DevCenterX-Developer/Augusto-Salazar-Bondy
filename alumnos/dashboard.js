@@ -475,9 +475,7 @@ Responde ÚNICAMENTE con este JSON exacto (sin markdown, sin texto extra):
 }`;
 
   try {
-    // Intentar primero con Claude (Anthropic), luego Gemini como fallback
-    let result = await AppUtils.callClaudeAI(prompt);
-    if (result.error) result = await AppUtils.callGeminiAI(prompt);
+    const result = await AppUtils.callGeminiAI(prompt);
 
     const zone = document.getElementById('ai-feedback-zone');
     if (!zone) return;

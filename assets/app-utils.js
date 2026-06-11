@@ -178,32 +178,14 @@ const CLASS_COLORS = [
 ];
 function getClassColor(idx) { return CLASS_COLORS[idx % CLASS_COLORS.length]; }
 
-// ── Claude AI (Anthropic) ─────────────────────
-async function callClaudeAI(prompt) {
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-    const data = await res.json();
-    if (data.error) return { error: true, message: data.error.message };
-    const text = data.content?.filter(b => b.type === 'text').map(b => b.text).join('') || '';
-    return { text };
-  } catch (err) { return { error: true, message: err.message }; }
-}
-
-// ── Gemini AI (fallback legacy) ───────────────
+// ── Gemini AI ─────────────────────────────────
 async function callGeminiAI(prompt) {
   const cfg = APP_CONFIG || await loadAppConfig();
   const apiKey = cfg.ai?.apiKey;
-  if (!apiKey || apiKey.startsWith('TU_GEMINI') || apiKey.length < 10) return { error: true, message: 'API Key de Gemini no configurada.' };
+  if (!apiKey || apiKey.length < 10) return { error: true, message: 'API Key de Gemini no configurada.' };
+  const model = cfg.ai?.model || 'gemini-2.5-flash';
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${cfg.ai.model || 'gemini-1.5-flash'}:generateContent?key=${apiKey}`, {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
@@ -252,6 +234,6 @@ window.AppUtils = {
   loadAppConfig, initFirebase, showToast, showLoader, hideLoader,
   initTheme, toggleTheme, resetThemeToAuto, initSidebarMobile, logout, getCurrentUser,
   getInitials, formatDate, formatDateTime, isOverdue,
-  getClassColor, callClaudeAI, callGeminiAI, getFileIcon, getResourceType,
+  getClassColor, callGeminiAI, getFileIcon, getResourceType,
   openModal, closeModal, generateClassCode
 };

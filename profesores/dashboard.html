@@ -99,7 +99,7 @@
       <div id="page-actividades" class="page-section hidden">
         <div class="page-header">
           <div><h2>Actividades</h2><p>Crea y gestiona actividades interactivas</p></div>
-          <button class="btn-primary" onclick="openModal('create-activity-modal')"><i class="fas fa-plus"></i> Nueva actividad</button>
+          <button class="btn-primary" onclick="editingActivityId=null;document.querySelector('#create-activity-modal .modal-header h3').innerHTML='<i class=\'fas fa-tasks\'></i> Nueva Actividad';openModal('create-activity-modal')"><i class="fas fa-plus"></i> Nueva actividad</button>
         </div>
         <div class="card" style="margin-bottom:16px">
           <div class="card-body" style="padding:14px 20px;display:flex;gap:12px;flex-wrap:wrap">

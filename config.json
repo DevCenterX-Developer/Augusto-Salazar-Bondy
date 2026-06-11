@@ -18,7 +18,7 @@
   "ai": {
     "provider": "gemini",
     "apiKey": ["AIzaS", "yBLwSL", "MiKqGBcuRNvno", "PEV6i2CM6RuHmZQ"],
-    "model": "gemini-1.5-flash",
+    "model": "gemini-2.5-flash",
     "enabled": true
   },
   "app": {
