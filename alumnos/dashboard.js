@@ -156,7 +156,7 @@ async function loadAllActivities() {
     const snap = await getDocs(query(collection(db, 'activities'), where('classId', '==', cls.id), where('published', '==', true)));
     snap.docs.forEach(d => allActivities.push({ id: d.id, className: cls.name, ...d.data() }));
   }
-  // Entregas del estudiante
+  // Siempre recargar entregas para reflejar el estado más actual
   const subSnap = await getDocs(query(collection(db, 'submissions'), where('studentId', '==', studentData.uid)));
   allSubmissions = subSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
@@ -229,7 +229,20 @@ function renderDashboardPending() {
 
 // ── Abrir actividad ───────────────────────────
 async function openActivity(activityId) {
-  const activity = allActivities.find(a => a.id === activityId);
+  let activity = allActivities.find(a => a.id === activityId);
+  // Si la actividad no está en caché (abierta desde modal de clase), buscarla en Firestore
+  if (!activity) {
+    try {
+      const { db, doc, getDoc } = await AppUtils.initFirebase();
+      const snap = await getDoc(doc(db, 'activities', activityId));
+      if (snap.exists()) {
+        activity = { id: snap.id, ...snap.data() };
+        // Buscar el nombre de la clase
+        const cls = studentClasses.find(c => c.id === activity.classId);
+        if (cls) activity.className = cls.name;
+      }
+    } catch(e) { console.error(e); }
+  }
   if (!activity) return;
   currentActivity = activity;
   const sub = allSubmissions.find(s => s.activityId === activityId);
@@ -342,11 +355,22 @@ async function submitActivity(activityId) {
     return form.querySelector(`input[name="q_${i}"]:checked`)?.value || '';
   });
 
+  // Verificar que haya al menos una respuesta en preguntas respondibles
+  const respondibles = (activity.questions || []).filter(q => !['text','image','video','link'].includes(q.type));
+  const hayRespuesta = respondibles.length === 0 || answers.some((a, i) => {
+    const q = (activity.questions || [])[i];
+    if (!q || ['text','image','video','link'].includes(q.type)) return false;
+    return Array.isArray(a) ? a.length > 0 : (a || '').trim().length > 0;
+  });
+  if (!hayRespuesta) {
+    AppUtils.showToast('Responde al menos una pregunta antes de enviar.', 'warning');
+    return;
+  }
+
   AppUtils.showLoader('Enviando actividad...');
   try {
     const { db, collection, addDoc, serverTimestamp } = await AppUtils.initFirebase();
 
-    // ✅ FIX: No incluir grade:undefined — Firestore no acepta undefined
     const subData = {
       activityId,
       classId:     activity.classId,
@@ -356,21 +380,50 @@ async function submitActivity(activityId) {
       submittedAt: serverTimestamp(),
       teacherComment: '',
       aiFeedback: null
-      // 'grade' NO se incluye hasta que el profesor lo asigne
     };
 
     const subDoc = await addDoc(collection(db, 'submissions'), subData);
-    allSubmissions.push({ id: subDoc.id, activityId, studentId: studentData.uid, answers });
+    const localSub = {
+      id: subDoc.id, activityId, classId: activity.classId,
+      studentId: studentData.uid, studentName: studentData.name,
+      answers, submittedAt: new Date(), teacherComment: '', aiFeedback: null
+    };
+    allSubmissions.push(localSub);
 
     AppUtils.hideLoader();
-    closeModal('activity-modal');
     AppUtils.showToast('¡Actividad enviada!', 'success');
     renderAllActivities('all');
     renderDashboardPending();
     updateDashboardStats();
 
-    // IA en segundo plano
-    requestAIFeedback(subDoc.id, activityId, answers, activity);
+    // ── Mostrar panel de IA inmediatamente en el modal ──
+    const body   = document.getElementById('activity-modal-body');
+    const footer = document.getElementById('activity-modal-footer');
+
+    // Mostrar respuestas enviadas + spinner de IA
+    let html = `<div class="submission-success-banner">
+      <i class="fas fa-check-circle"></i>
+      <span>¡Actividad entregada con éxito!</span>
+    </div>`;
+    html += `<div class="section-title" style="margin-top:16px">Tus respuestas</div>`;
+    html += renderSubmittedAnswers(activity, localSub);
+    html += `<div id="ai-feedback-zone">
+      <div class="ai-feedback ai-feedback-loading">
+        <div class="ai-feedback-header">
+          <span class="ai-badge"><i class="fas fa-robot"></i> IA Educativa</span>
+          <h4>Analizando tus respuestas...</h4>
+        </div>
+        <div class="ai-loading-dots">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+    </div>`;
+    body.innerHTML = html;
+    footer.innerHTML = `<button class="btn-secondary" onclick="closeModal('activity-modal')">Cerrar</button>`;
+
+    // Solicitar IA y actualizar la zona cuando llegue
+    requestAIFeedback(subDoc.id, activityId, answers, activity, localSub);
+
   } catch (err) {
     AppUtils.hideLoader();
     AppUtils.showToast('Error enviando. Intenta de nuevo.', 'error');
@@ -378,47 +431,118 @@ async function submitActivity(activityId) {
   }
 }
 
-// ── IA Gemini ─────────────────────────────────
-async function requestAIFeedback(subId, activityId, answers, activity) {
+// ── IA Claude (Anthropic) ────────────────────
+async function requestAIFeedback(subId, activityId, answers, activity, localSub) {
   const cfg = await AppUtils.loadAppConfig();
-  if (!cfg.ai?.enabled || cfg.ai?.apiKey === 'TU_GEMINI_API_KEY') return;
+  if (cfg.ai?.enabled === false) {
+    document.getElementById('ai-feedback-zone')?.remove();
+    return;
+  }
 
-  const questionsText = (activity.questions || []).map((q, i) =>
-    `Pregunta ${i+1} (${q.type}): ${q.text}\nRespuesta: ${Array.isArray(answers[i]) ? answers[i].join(', ') : answers[i] || 'Sin respuesta'}`
-  ).join('\n\n');
+  // Solo preguntas respondibles (no texto info, imagen, etc.)
+  const preguntasRespondibles = (activity.questions || []).filter(q =>
+    !['text','image','video','link'].includes(q.type)
+  );
 
-  const prompt = `Eres un asistente educativo de la I.E. Augusto Salazar Bondy 4015, Carmen de la Legua, Callao.
-Analiza las respuestas del estudiante a la actividad "${activity.title}" y da retroalimentación educativa en español.
+  if (!preguntasRespondibles.length) {
+    document.getElementById('ai-feedback-zone')?.remove();
+    return;
+  }
+
+  const questionsText = preguntasRespondibles.map((q, qi) => {
+    // Encontrar el índice original de la pregunta
+    const origIdx = (activity.questions || []).findIndex((orig, i) => orig === q || (orig.text === q.text && orig.type === q.type));
+    const respuesta = answers[origIdx >= 0 ? origIdx : qi];
+    return `Pregunta ${qi+1} (tipo: ${q.type}): ${q.text}\nRespuesta del estudiante: ${Array.isArray(respuesta) ? respuesta.join(', ') : (respuesta || 'Sin respuesta')}`;
+  }).join('\n\n');
+
+  const prompt = `Eres un asistente educativo amigable de la I.E. Augusto Salazar Bondy 4015, Lima, Perú.
+Revisa las respuestas del estudiante y proporciona retroalimentación educativa constructiva en español.
+Actividad: "${activity.title}"
+Materia/Clase: "${activity.className || 'Curso'}"
 
 ${questionsText}
 
-Responde SOLO con este JSON (sin markdown):
-{"resumen":"evaluación general breve","errores":"errores encontrados","sugerencias":"sugerencias de mejora","puntuacion_sugerida":${activity.maxScore||20},"nivel":"Excelente|Bueno|Regular|Necesita mejorar"}`;
+Responde ÚNICAMENTE con este JSON exacto (sin markdown, sin texto extra):
+{
+  "nivel": "Excelente" | "Bueno" | "Regular" | "Necesita mejorar",
+  "puntuacion_sugerida": número entre 0 y ${activity.maxScore || 20},
+  "resumen": "Evaluación general en 2-3 oraciones motivadoras",
+  "fortalezas": "Lo que hizo bien el estudiante",
+  "errores": "Errores o áreas de mejora detectadas (vacío si no hay)",
+  "sugerencias": "Consejos específicos para mejorar",
+  "pregunta_reflexion": "Una pregunta corta que invite al estudiante a reflexionar más"
+}`;
 
   try {
-    const result = await AppUtils.callGeminiAI(prompt);
-    if (result.error) return;
-    let feedback;
-    try { feedback = JSON.parse(result.text.replace(/```json|```/g,'').trim()); }
-    catch { feedback = { resumen: result.text, errores:'', sugerencias:'', puntuacion_sugerida: null, nivel:'Regular' }; }
+    // Intentar primero con Claude (Anthropic), luego Gemini como fallback
+    let result = await AppUtils.callClaudeAI(prompt);
+    if (result.error) result = await AppUtils.callGeminiAI(prompt);
 
-    const { db, doc, updateDoc } = await AppUtils.initFirebase();
-    await updateDoc(doc(db, 'submissions', subId), { aiFeedback: feedback });
-    const sub = allSubmissions.find(s => s.activityId === activityId);
-    if (sub) sub.aiFeedback = feedback;
-  } catch(err) { console.error('Error IA:', err); }
+    const zone = document.getElementById('ai-feedback-zone');
+    if (!zone) return;
+
+    if (result.error) {
+      zone.innerHTML = `<div class="ai-feedback" style="border-color:var(--danger-light)">
+        <p style="color:var(--danger);font-size:0.88rem"><i class="fas fa-exclamation-circle"></i> La IA no pudo analizar tus respuestas ahora. Tu entrega fue guardada correctamente.</p>
+      </div>`;
+      return;
+    }
+
+    let feedback;
+    try {
+      feedback = JSON.parse(result.text.replace(/```json|```/g,'').trim());
+    } catch {
+      feedback = {
+        resumen: result.text, fortalezas: '', errores: '',
+        sugerencias: '', puntuacion_sugerida: null, nivel: 'Regular', pregunta_reflexion: ''
+      };
+    }
+
+    // Guardar en Firestore en segundo plano
+    try {
+      const { db, doc, updateDoc } = await AppUtils.initFirebase();
+      await updateDoc(doc(db, 'submissions', subId), { aiFeedback: feedback });
+      if (localSub) localSub.aiFeedback = feedback;
+      const cached = allSubmissions.find(s => s.id === subId);
+      if (cached) cached.aiFeedback = feedback;
+    } catch(e) { console.error('Error guardando feedback IA:', e); }
+
+    if (zone) zone.innerHTML = renderAIFeedback(feedback);
+
+  } catch(err) {
+    console.error('Error IA:', err);
+    const zone = document.getElementById('ai-feedback-zone');
+    if (zone) zone.remove();
+  }
 }
 
 function renderAIFeedback(fb) {
+  const nivelColor = {
+    'Excelente': '#065f46', 'Bueno': '#1e40af',
+    'Regular': '#92400e', 'Necesita mejorar': '#991b1b'
+  };
+  const nivelBg = {
+    'Excelente': '#d1fae5', 'Bueno': '#dbeafe',
+    'Regular': '#fef3c7', 'Necesita mejorar': '#fee2e2'
+  };
+  const color = nivelColor[fb.nivel] || '#1e40af';
+  const bg    = nivelBg[fb.nivel]    || '#dbeafe';
+
   return `<div class="ai-feedback">
     <div class="ai-feedback-header">
-      <span class="ai-badge"><i class="fas fa-robot"></i> IA Gemini</span>
+      <span class="ai-badge"><i class="fas fa-robot"></i> IA Educativa</span>
       <h4>Retroalimentación educativa</h4>
     </div>
-    ${fb.nivel ? `<div style="margin-bottom:12px"><span class="tag tag-blue">Nivel: ${fb.nivel}</span>${fb.puntuacion_sugerida != null ? ` <strong style="color:var(--primary);margin-left:12px">Puntuación sugerida: ${fb.puntuacion_sugerida}</strong>` : ''}</div>` : ''}
-    ${fb.resumen    ? `<div class="ai-section"><div class="ai-section-title">📋 Evaluación general</div><p>${fb.resumen}</p></div>` : ''}
-    ${fb.errores    ? `<div class="ai-section"><div class="ai-section-title">⚠️ Errores detectados</div><p>${fb.errores}</p></div>` : ''}
-    ${fb.sugerencias? `<div class="ai-section"><div class="ai-section-title">💡 Sugerencias</div><p>${fb.sugerencias}</p></div>` : ''}
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;flex-wrap:wrap">
+      ${fb.nivel ? `<span style="background:${bg};color:${color};padding:5px 14px;border-radius:50px;font-weight:700;font-size:0.88rem">${fb.nivel}</span>` : ''}
+      ${fb.puntuacion_sugerida != null ? `<span style="color:var(--primary);font-weight:700;font-size:0.95rem"><i class="fas fa-star" style="color:var(--accent)"></i> Nota sugerida: ${fb.puntuacion_sugerida} pts</span>` : ''}
+    </div>
+    ${fb.resumen     ? `<div class="ai-section"><div class="ai-section-title">📋 Evaluación general</div><p>${fb.resumen}</p></div>` : ''}
+    ${fb.fortalezas  ? `<div class="ai-section"><div class="ai-section-title">✅ Fortalezas</div><p>${fb.fortalezas}</p></div>` : ''}
+    ${fb.errores     ? `<div class="ai-section"><div class="ai-section-title">⚠️ Áreas de mejora</div><p>${fb.errores}</p></div>` : ''}
+    ${fb.sugerencias ? `<div class="ai-section"><div class="ai-section-title">💡 Sugerencias</div><p>${fb.sugerencias}</p></div>` : ''}
+    ${fb.pregunta_reflexion ? `<div class="ai-section ai-reflection"><div class="ai-section-title">🤔 Para reflexionar</div><p><em>${fb.pregunta_reflexion}</em></p></div>` : ''}
   </div>`;
 }
 

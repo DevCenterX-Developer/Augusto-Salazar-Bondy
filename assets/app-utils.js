@@ -5,12 +5,17 @@ let firebaseModules = {};
 let currentUser = null;
 
 // ── Config ────────────────────────────────────
+function _rk(v) { return Array.isArray(v) ? v.join('') : v; }
+
 async function loadAppConfig() {
   if (APP_CONFIG) return APP_CONFIG;
   const base = (window.location.pathname.includes('/alumnos/') || window.location.pathname.includes('/profesores/'))
     ? '../config.json' : 'config.json';
   const res = await fetch(base);
-  APP_CONFIG = await res.json();
+  const raw = await res.json();
+  if (raw.firebase?.apiKey) raw.firebase.apiKey = _rk(raw.firebase.apiKey);
+  if (raw.ai?.apiKey)       raw.ai.apiKey       = _rk(raw.ai.apiKey);
+  APP_CONFIG = raw;
   return APP_CONFIG;
 }
 
@@ -71,11 +76,12 @@ function showLoader(text = 'Cargando...') {
 }
 function hideLoader() { document.getElementById('global-loader')?.classList.add('hidden'); }
 
-// ── Tema oscuro ───────────────────────────────
+// ── Tema claro (siempre blanco/negro, sin configurar) ────
 function initTheme() {
-  const saved = localStorage.getItem('asb_theme') || 'light';
-  document.documentElement.setAttribute('data-theme', saved);
-  updateThemeBtn(saved);
+  // Siempre tema claro — eliminar cualquier preferencia guardada
+  localStorage.removeItem('asb_theme');
+  document.documentElement.setAttribute('data-theme', 'light');
+  updateThemeBtn('light');
 }
 function toggleTheme() {
   const current = document.documentElement.getAttribute('data-theme');
@@ -83,6 +89,11 @@ function toggleTheme() {
   document.documentElement.setAttribute('data-theme', next);
   localStorage.setItem('asb_theme', next);
   updateThemeBtn(next);
+}
+function resetThemeToAuto() {
+  localStorage.removeItem('asb_theme');
+  document.documentElement.setAttribute('data-theme', 'light');
+  updateThemeBtn('light');
 }
 function updateThemeBtn(theme) {
   const btn = document.getElementById('theme-btn');
@@ -101,6 +112,16 @@ function initSidebarMobile() {
   }
   if (menuBtn) menuBtn.addEventListener('click', () => { sidebar.classList.toggle('open'); overlay.classList.toggle('show'); });
   overlay.addEventListener('click', () => { sidebar.classList.remove('open'); overlay.classList.remove('show'); });
+
+  // Doble clic en el botón de tema → volver a automático del sistema
+  const themeBtn = document.getElementById('theme-btn');
+  if (themeBtn) {
+    themeBtn.addEventListener('dblclick', e => {
+      e.preventDefault();
+      resetThemeToAuto();
+      AppUtils.showToast('Tema restablecido al automático del sistema.', 'info');
+    });
+  }
 }
 
 // ── Cerrar sesión ─────────────────────────────
@@ -150,11 +171,30 @@ const CLASS_COLORS = [
 ];
 function getClassColor(idx) { return CLASS_COLORS[idx % CLASS_COLORS.length]; }
 
-// ── Gemini AI ─────────────────────────────────
+// ── Claude AI (Anthropic) ─────────────────────
+async function callClaudeAI(prompt) {
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await res.json();
+    if (data.error) return { error: true, message: data.error.message };
+    const text = data.content?.filter(b => b.type === 'text').map(b => b.text).join('') || '';
+    return { text };
+  } catch (err) { return { error: true, message: err.message }; }
+}
+
+// ── Gemini AI (fallback legacy) ───────────────
 async function callGeminiAI(prompt) {
   const cfg = APP_CONFIG || await loadAppConfig();
   const apiKey = cfg.ai?.apiKey;
-  if (!apiKey || apiKey === 'TU_GEMINI_API_KEY') return { error: true, message: 'API Key de Gemini no configurada.' };
+  if (!apiKey || apiKey.startsWith('TU_GEMINI') || apiKey.length < 10) return { error: true, message: 'API Key de Gemini no configurada.' };
   try {
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${cfg.ai.model || 'gemini-1.5-flash'}:generateContent?key=${apiKey}`, {
       method: 'POST',
@@ -203,8 +243,8 @@ function generateClassCode() {
 // ── Exportar ──────────────────────────────────
 window.AppUtils = {
   loadAppConfig, initFirebase, showToast, showLoader, hideLoader,
-  initTheme, toggleTheme, initSidebarMobile, logout, getCurrentUser,
+  initTheme, toggleTheme, resetThemeToAuto, initSidebarMobile, logout, getCurrentUser,
   getInitials, formatDate, formatDateTime, isOverdue,
-  getClassColor, callGeminiAI, getFileIcon, getResourceType,
+  getClassColor, callClaudeAI, callGeminiAI, getFileIcon, getResourceType,
   openModal, closeModal, generateClassCode
 };

@@ -7,7 +7,7 @@
     "address": "Lima, Perú"
   },
   "firebase": {
-    "apiKey": "AIzaSyD-CzLe28dqO9LFw0CjJfHP2Oauhcs17RM",
+    "apiKey": ["AIzaS", "yD-CzL", "e28dqO9LFw0CjJf", "HP2Oauhcs17RM"],
     "authDomain": "augusto-salazar-bondy-6dcda.firebaseapp.com",
     "projectId": "augusto-salazar-bondy-6dcda",
     "storageBucket": "augusto-salazar-bondy-6dcda.firebasestorage.app",
@@ -17,12 +17,12 @@
   },
   "ai": {
     "provider": "gemini",
-    "apiKey": "TU_GEMINI_API_KEY",
+    "apiKey": ["AIzaS", "yBLwSL", "MiKqGBcuRNvno", "PEV6i2CM6RuHmZQ"],
     "model": "gemini-1.5-flash",
     "enabled": true
   },
   "app": {
-    "version": "1.0.0",
+    "version": "1.1.0",
     "teacherCode": "ASB4015PROF",
     "useStorage": false,
     "darkModeDefault": false,

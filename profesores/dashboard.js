@@ -26,6 +26,7 @@ function navigateTo(page) {
   document.querySelector('.sidebar-overlay')?.classList.remove('show');
   if (page === 'calificaciones') loadSubmissionsForGrading();
   if (page === 'estadisticas') loadStats();
+  if (page === 'actividades') renderTeacherActivities();
 }
 
 function openModal(id) { document.getElementById(id)?.classList.remove('hidden'); }
@@ -153,12 +154,17 @@ async function createClass() {
   } catch(err) { AppUtils.hideLoader(); AppUtils.showToast('Error creando clase.','error'); console.error(err); }
 }
 
-// Generar código al abrir el modal
-document.addEventListener('click', e => {
-  if (e.target.id === 'create-class-modal' || e.target.closest('#create-class-modal')) {
-    const ci = document.getElementById('new-class-code');
-    if (ci && !ci.value) ci.value = AppUtils.generateClassCode();
-  }
+// Generar código al abrir el modal de crear clase
+document.addEventListener('DOMContentLoaded', () => {
+  const openModalBtns = document.querySelectorAll('[onclick*="create-class-modal"]');
+  openModalBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      setTimeout(() => {
+        const ci = document.getElementById('new-class-code');
+        if (ci && !ci.value) ci.value = AppUtils.generateClassCode();
+      }, 50);
+    });
+  });
 });
 
 async function openClassManage(classId) {
@@ -301,11 +307,11 @@ function renderTeacherActivities(filtered = null) {
 }
 
 function filterTeacherActivities() {
-  const classId = document.getElementById('activity-class-filter')?.value;
-  const status  = document.getElementById('activity-status-filter')?.value;
+  const classId = document.getElementById('activity-class-filter')?.value || '';
+  const status  = document.getElementById('activity-status-filter')?.value || '';
   let f = teacherActivities;
   if (classId) f = f.filter(a => a.classId === classId);
-  if (status === 'published') f = f.filter(a => a.published);
+  if (status === 'published') f = f.filter(a =>  a.published);
   if (status === 'draft')     f = f.filter(a => !a.published);
   renderTeacherActivities(f);
 }
@@ -383,6 +389,7 @@ async function saveActivity() {
     const ref = await addDoc(collection(db, 'activities'), actData);
     teacherActivities.push({ id: ref.id, ...actData });
     renderTeacherActivities();
+    updateDashboardStats();
     AppUtils.hideLoader();
     closeModal('create-activity-modal');
     questions = [];
@@ -407,18 +414,21 @@ async function deleteActivity(id) {
   const { db, doc, deleteDoc } = await AppUtils.initFirebase();
   await deleteDoc(doc(db,'activities',id));
   teacherActivities = teacherActivities.filter(a=>a.id!==id);
+  allSubmissions = allSubmissions.filter(s=>s.activityId!==id);
   renderTeacherActivities();
+  updateDashboardStats();
   AppUtils.showToast('Actividad eliminada.','info');
 }
 
 // ── Calificaciones ────────────────────────────
 async function loadAllSubmissions() {
-  if (!teacherActivities.length) { allSubmissions=[]; return; }
+  allSubmissions = [];
+  if (!teacherActivities.length) return;
   const { db, collection, query, where, getDocs } = await AppUtils.initFirebase();
   const ids = teacherActivities.map(a=>a.id);
-  allSubmissions = [];
   for (let i=0; i<ids.length; i+=10) {
     const chunk = ids.slice(i,i+10);
+    if (!chunk.length) continue;
     const q = query(collection(db,'submissions'), where('activityId','in',chunk));
     const snap = await getDocs(q);
     snap.docs.forEach(d => allSubmissions.push({id:d.id,...d.data()}));
@@ -524,6 +534,7 @@ async function saveGrade() {
     AppUtils.hideLoader();
     closeModal('grade-modal');
     AppUtils.showToast('Calificación guardada.','success');
+    updateDashboardStats();
     loadSubmissionsForGrading();
   } catch(err){ AppUtils.hideLoader(); AppUtils.showToast('Error.','error'); console.error(err); }
 }
