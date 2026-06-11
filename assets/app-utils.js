@@ -75,24 +75,32 @@ function showLoader(text = 'Cargando...') {
 }
 function hideLoader() { document.getElementById('global-loader')?.classList.add('hidden'); }
 
-// ── Tema claro (siempre blanco/negro, sin configurar) ────
+// ── Tema automático según sistema operativo ────
 function initTheme() {
-  // Siempre tema claro — eliminar cualquier preferencia guardada
-  localStorage.removeItem('asb_theme');
-  document.documentElement.setAttribute('data-theme', 'light');
-  updateThemeBtn('light');
+  const saved = localStorage.getItem('asb_theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const theme = saved || (prefersDark ? 'dark' : 'light');
+  applyTheme(theme);
+  // Seguir cambios del sistema si no hay preferencia manual
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+    if (!localStorage.getItem('asb_theme')) applyTheme(e.matches ? 'dark' : 'light');
+  });
+}
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  updateThemeBtn(theme);
 }
 function toggleTheme() {
   const current = document.documentElement.getAttribute('data-theme');
   const next = current === 'dark' ? 'light' : 'dark';
-  document.documentElement.setAttribute('data-theme', next);
   localStorage.setItem('asb_theme', next);
-  updateThemeBtn(next);
+  applyTheme(next);
 }
 function resetThemeToAuto() {
   localStorage.removeItem('asb_theme');
-  document.documentElement.setAttribute('data-theme', 'light');
-  updateThemeBtn('light');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  applyTheme(prefersDark ? 'dark' : 'light');
+  showToast('Tema automático según el sistema.', 'info');
 }
 function updateThemeBtn(theme) {
   const btn = document.getElementById('theme-btn');

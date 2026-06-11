@@ -27,22 +27,23 @@
   <!-- Página principal de login -->
   <div class="login-wrapper" id="login-wrapper">
     
-    <!-- Panel izquierdo decorativo -->
+    <!-- Panel izquierdo — identidad institucional -->
     <div class="login-left">
       <div class="login-left-content">
         <div class="school-badge">
-          <div class="badge-icon"><img src="assets/logo.png" style="width:52px;height:52px;object-fit:contain;border-radius:50%"/></div>
+          <img src="assets/logo.png" style="width:44px;height:44px;object-fit:contain;border-radius:10px"/>
         </div>
         <h1 class="school-title">I.E. Augusto<br>Salazar Bondy</h1>
-        <p class="school-sub">Institución Educativa N° 4015</p>
+        <p class="school-sub">Institución Educativa N° 4015 — Lima, Perú</p>
         <div class="school-links">
           <a href="https://www.facebook.com/share/18pBELJ6jw/" target="_blank" class="social-link">
-            <i class="fab fa-facebook"></i> Facebook
+            <i class="fab fa-facebook"></i> Página de Facebook
           </a>
           <a href="https://share.google/YClJ9vYz95HX5Omny" target="_blank" class="social-link">
-            <i class="fas fa-map-marker-alt"></i> Ubicación
+            <i class="fas fa-map-marker-alt"></i> Ver ubicación
           </a>
         </div>
+        <span class="institution-number">4015</span>
         <div class="login-deco-circles">
           <div class="deco-c c1"></div>
           <div class="deco-c c2"></div>
@@ -58,8 +59,9 @@
         <!-- Selector de rol -->
         <div id="role-selector" class="auth-section active">
           <div class="auth-header">
+            <div class="welcome-chip"><i class="fas fa-graduation-cap"></i> Plataforma Educativa</div>
             <h2>Bienvenido</h2>
-            <p>¿Cómo deseas ingresar hoy?</p>
+            <p>Selecciona tu rol para continuar</p>
           </div>
           <div class="role-buttons">
             <button class="role-btn student-btn" onclick="selectRole('student')">
