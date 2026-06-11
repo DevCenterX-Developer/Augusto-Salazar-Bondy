@@ -13,8 +13,7 @@ async function loadAppConfig() {
     ? '../config.json' : 'config.json';
   const res = await fetch(base);
   const raw = await res.json();
-  if (raw.firebase?.apiKey) raw.firebase.apiKey = _rk(raw.firebase.apiKey);
-  if (raw.ai?.apiKey)       raw.ai.apiKey       = _rk(raw.ai.apiKey);
+  if (raw.ai?.apiKey) raw.ai.apiKey = _rk(raw.ai.apiKey);
   APP_CONFIG = raw;
   return APP_CONFIG;
 }
